@@ -90,6 +90,18 @@ notes recorded as conscious choices, not gaps:
 
 ---
 
+## Status log
+
+- **June 12 — Phase 0 + Phase 1 complete (local).** Full rules-only application working
+  end-to-end on a docker-compose stack (self-hosted Temporal on self-hosted Postgres, SQL
+  visibility, no Elasticsearch). All three inference triggers, pre-wake check, three actions +
+  activity log, instruction overrides, all lifecycle controls, all three system-owned
+  completion paths verified via `scripts/local_demo.sh` (17 assertions). Next.js UI builds and
+  serves. Single Gemini call site present with a hard fallback proven by `test_llm_fallback.py`
+  (runs deterministically with no/broken key). 19 rules + 4 fallback unit tests pass.
+- **Next:** Phase 2 gate (June 13) — lock deferred infra decisions (#4–7, #10) then build
+  Terraform (VPC/subnets/IGW/SGs/EC2/ECR), k3s bootstrap, deploy, monitoring, HPA.
+
 ## Standing constraints (from brief §8 — never violate)
 - No Elasticsearch. No RDS/Aurora/Supabase. No Temporal Cloud. No NAT gateway. No default VPC.
 - Port 7233 never open to `0.0.0.0/0`. Temporal Web UI never unauthenticated-public.
