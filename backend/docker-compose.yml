@@ -1,0 +1,96 @@
+# Local dev stack: self-hosted Temporal on self-hosted Postgres (same topology as the cloud
+# deploy), plus the FastAPI backend and the Temporal worker. SQL visibility, no Elasticsearch.
+#
+#   docker compose up --build
+#
+# Postgres serves both Temporal (temporal / temporal_visibility DBs, created by auto-setup) and
+# the app (orderpilot DB, created here via POSTGRES_DB).
+
+name: orderpilot
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: orderpilot
+    ports:
+      - "5433:5432"   # host:container — 5433 avoids clashing with a local Postgres on 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d orderpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres
+      # DBs are pre-created by the postgres init script; auto-setup only loads schema.
+      SKIP_DB_CREATE: "true"
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+      # SQL visibility only — no Elasticsearch (PDF p.4 hard requirement).
+      ENABLE_ES: "false"
+    ports:
+      - "7233:7233"
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  temporal-ui:
+    image: temporalio/ui:2.32.0
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+
+  backend:
+    build:
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      DB_HOST: postgres
+      DB_USER: temporal
+      DB_PASSWORD: temporal
+      DB_NAME: orderpilot
+      CORS_ORIGINS: "http://localhost:3000,*"
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "app.temporal.worker"]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      DB_HOST: postgres
+      DB_USER: temporal
+      DB_PASSWORD: temporal
+      DB_NAME: orderpilot
+
+volumes:
+  pgdata:
