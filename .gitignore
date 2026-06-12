@@ -1,0 +1,50 @@
+# ---- Secrets & credentials (HARD CONSTRAINT: never commit) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+**/secrets*
+**/*secret*
+kubeconfig
+*kubeconfig*
+.aws/
+credentials
+
+# ---- Terraform (never commit state) ----
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-error.log*
+
+# ---- OS / editor ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
