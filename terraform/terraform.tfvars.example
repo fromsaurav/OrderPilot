@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars to override defaults (all optional). tfvars is gitignored.
+# Defaults already produce a working two-node t3.medium cluster in ap-south-1.
+
+# aws_region   = "ap-south-1"
+# instance_type = "t3.medium"
+# node_port    = 30080
+
+# Pin the admin-ingress CIDR instead of auto-detecting your current public IP.
+# allowed_cidr = "203.0.113.4/32"

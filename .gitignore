@@ -14,8 +14,8 @@ kubeconfig
 credentials
 
 # ---- Terraform (never commit state) ----
+# NOTE: .terraform.lock.hcl IS committed on purpose (pins provider versions for reproducibility).
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfvars
@@ -49,3 +49,7 @@ yarn-error.log*
 .idea/
 .vscode/
 *.swp
+
+# Terraform binary plan files
+tfplan
+*.tfplan

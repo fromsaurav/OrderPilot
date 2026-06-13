@@ -1,0 +1,20 @@
+#!/bin/bash
+# k3s SERVER bootstrap (Decision #7: pure-Terraform via user-data).
+# Installs a single-server k3s control plane. Disables traefik + servicelb (we expose the API
+# via NodePort, Decision #4 — no in-cluster LoadBalancer controller). Advertises this node's
+# public IP so the rewritten kubeconfig validates TLS from the operator's laptop.
+set -euxo pipefail
+
+PUBLIC_IP="$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
+  --node-external-ip $${PUBLIC_IP} \
+  --tls-san $${PUBLIC_IP} \
+  --disable traefik \
+  --disable servicelb \
+  --write-kubeconfig-mode 644 \
+  --token ${k3s_token}" sh -
+
+# Readiness marker the fetch_kubeconfig / standup scripts can poll for.
+until k3s kubectl get nodes >/dev/null 2>&1; do sleep 3; done
+touch /tmp/k3s-server-ready

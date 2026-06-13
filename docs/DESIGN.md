@@ -78,15 +78,48 @@ notes recorded as conscious choices, not gaps:
 
 ---
 
-## Deferred decisions (Phase 2 gate — to be locked June 13 before infra work)
+## Phase 2 infra decisions (LOCKED — June 12 evening)
 
-| # | Decision | Current lean |
-|---|---|---|
-| 4 | API exposure (NodePort / LB / ingress) | **NodePort** + EC2 public IP, SG locked to my IP (hard constraint: no `type=LoadBalancer` — orphans an ELB past destroy) |
-| 5 | Secrets (K8s Secrets vs SSM) | **K8s Secrets** for in-cluster simplicity; revisit if bootstrap needs SSM |
-| 6 | Temporal install (official Helm chart vs hand-written manifests) | **Official Helm chart** with trimmed custom values, SQL visibility, no Elasticsearch |
-| 7 | k3s bootstrap (user-data / remote-exec / manual) | **EC2 user-data** (pure-Terraform, no documented bootstrap exception needed) |
-| 10 | One vs two t3.medium | TBD — must do explicit RAM budget (Temporal + Postgres + Prometheus + Grafana + app on 4 GB is tight); numbers before owner decides |
+### Decision #4 — API exposure: **NodePort + EC2 public IP, SG locked to operator IP**
+- **Rationale:** `type=LoadBalancer` is banned (creates an ELB outside Terraform state that
+  survives `destroy` and keeps billing). Ingress means running an ingress controller for no
+  benefit at one-API/one-cluster scale. NodePort (`30080`) reachable only from the operator's
+  IP is the zero-cost requirement and the simplest thing to defend. The local Next.js UI points
+  at `http://<server-public-ip>:30080`.
+
+### Decision #5 — Secrets: **K8s Secrets**
+- **Rationale:** only two secrets exist (Postgres password, optional Gemini key). Created at
+  standup from local env vars (never committed). Zero extra plumbing. SSM would add an IAM
+  instance role + fetch logic for no real gain on a POC.
+
+### Decision #6 — Temporal install: **hand-written manifests using the `temporalio/auto-setup` image**
+- **Rationale:** the same image our docker-compose already runs successfully against Postgres
+  (SQL visibility, no Elasticsearch). Proven, lightest (one pod ~600 MiB vs the Helm chart's
+  four service pods), and easiest to defend on video ("identical to what we tested locally").
+  Re-runs idempotent schema setup on start, which also fits the re-seedable demo rhythm.
+
+### Decision #7 — k3s bootstrap: **EC2 user-data (pure Terraform)**
+- **Rationale:** no documented bootstrap exception needed, no SSH dependency during `apply`.
+  Server node inits the cluster; agent node joins via a pre-generated shared token (random,
+  in local state only) + the server's private IP. `remote-exec` is racy (couples apply to SSH);
+  a manual step breaks the 100%-Terraform goal.
+
+### Decision #10 — Node count: **TWO t3.medium (k3s server + agent)**
+- **Rationale:** single-node RAM budget left only ~300 MiB headroom at the moment monitoring and
+  the HPA load test run **together** — which is exactly the on-camera moment. The brief ranks
+  demo reliability above minimalism, and the HPA load test *deliberately* spikes resource use,
+  so we size for reliability. Two nodes put the scaling workers + headroom on node 2 and remove
+  the OOM risk. Cost: multi-node k3s (agent join token + a few node-to-node SG rules) and ~2×
+  compute, comfortably inside the $120 credit.
+- **Topology:** one user-data template per role. Server inits k3s (`--node-external-ip`,
+  `--tls-san` = its public IP via IMDS, traefik + servicelb disabled, NodePort only). Agent
+  waits for `https://<server-private-ip>:6443/ping` then joins with `K3S_URL` + `K3S_TOKEN`.
+- **Node-to-node SG (self-referencing, never public):** k3s API `6443/tcp`, kubelet `10250/tcp`,
+  flannel VXLAN `8472/udp`. Operator-only ingress: SSH `22`, kube API `6443`, NodePort `30080`,
+  each from the operator IP only. Temporal `7233` stays a ClusterIP (pod network) — no SG rule,
+  never exposed.
+- **Monitoring trim (applies regardless):** Alertmanager disabled (PDF: no alerting), only the
+  exporters we show, explicit resource requests/limits on every pod, one Grafana dashboard.
 
 ---
 
