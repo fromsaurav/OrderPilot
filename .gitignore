@@ -8,8 +8,10 @@
 *.crt
 **/secrets*
 **/*secret*
-kubeconfig
-*kubeconfig*
+# the generated kubeconfig (has cluster creds) lives at repo root; ignore just that file,
+# not scripts whose name contains "kubeconfig" (e.g. scripts/fetch_kubeconfig.sh)
+/kubeconfig
+*.kubeconfig
 .aws/
 credentials
 
