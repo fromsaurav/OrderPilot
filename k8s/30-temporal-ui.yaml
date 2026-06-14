@@ -28,6 +28,9 @@ spec:
       labels:
         app: temporal-ui
     spec:
+      # Stop k8s injecting <SVC>_PORT=tcp://... env vars; the auto-injected TEMPORAL_UI_PORT
+      # (from this service's name) collides with the UI image's own integer port config.
+      enableServiceLinks: false
       nodeSelector:
         node-role.kubernetes.io/control-plane: "true"
       containers:

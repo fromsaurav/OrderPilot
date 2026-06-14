@@ -7,7 +7,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API="${1:-${API:-$(terraform -chdir="$ROOT/terraform" output -raw api_nodeport_url 2>/dev/null || echo http://localhost:8000)}}"
 echo "Seeding against $API"
 
-post() { curl -s -X POST "$API$1" -H 'content-type: application/json' -d "${2:-{}}"; }
+post() { local b="${2:-}"; [ -z "$b" ] && b='{}'   # avoid ${2:-{}} brace clash
+         curl -s -X POST "$API$1" -H 'content-type: application/json' -d "$b"; }
 start() { post /runs "{\"order_id\":\"$1\",\"wake_interval_s\":${2:-30},\"max_run_age_s\":86400}" | jq -r .run_id; }
 ev()    { post "/runs/$1/events" "{\"type\":\"$2\"${3:+,\"payload\":$3}}" >/dev/null; }
 
