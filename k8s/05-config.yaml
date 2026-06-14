@@ -18,5 +18,5 @@ data:
   # Enabled, but inert until a non-empty gemini-api-key is in the orderpilot-secrets Secret
   # (pass GEMINI_API_KEY to deploy.sh / standup.sh). With no key it stays on the rules path.
   LLM_ENABLED: "true"
-  GEMINI_MODEL: gemini-1.5-flash
+  GEMINI_MODEL: gemini-2.5-flash
   CORS_ORIGINS: "*"

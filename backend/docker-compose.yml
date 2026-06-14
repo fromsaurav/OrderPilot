@@ -95,6 +95,7 @@ services:
       # or the shell env to enable Gemini for customer_message_received; empty = rules path.
       LLM_ENABLED: "${LLM_ENABLED:-true}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      GEMINI_MODEL: "${GEMINI_MODEL:-gemini-2.5-flash}"
 
 volumes:
   pgdata:

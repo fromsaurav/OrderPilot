@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # purely on rules, and simply supplying GEMINI_API_KEY turns the single LLM call site on.
     llm_enabled: bool = True
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-2.5-flash"  # 1.5 models were retired; override via GEMINI_MODEL
 
     # --- API ---
     cors_origins: str = "*"
