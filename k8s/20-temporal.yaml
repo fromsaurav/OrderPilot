@@ -14,6 +14,9 @@ spec:
     - name: grpc
       port: 7233
       targetPort: 7233
+    - name: metrics
+      port: 9090
+      targetPort: 9090
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -41,7 +44,11 @@ spec:
           image: temporalio/auto-setup:1.25.2
           ports:
             - containerPort: 7233
+            - containerPort: 9090
           env:
+            # Expose Temporal server metrics for Prometheus (config_template gates on this).
+            - name: PROMETHEUS_ENDPOINT
+              value: "0.0.0.0:9090"
             - name: DB
               value: postgres12
             - name: DB_PORT

@@ -1,6 +1,7 @@
 # Monitoring (Prometheus + Grafana) — in simple words
 
-> Status: design locked; deployed in Phase 4. Commands below are what we run once it's installed.
+> Status: **deployed** (Helm release `kps`, namespace `monitoring`). One dashboard:
+> "OrderPilot — Cluster & Temporal".
 
 ## What it is
 - **Prometheus** = a database that **collects numbers over time** ("metrics"): CPU, memory,
@@ -20,14 +21,14 @@ One Grafana dashboard showing:
 
 ## How you open it (it is NOT public)
 Grafana is deliberately **not exposed to the internet** (a graded security point). You reach it
-through a temporary tunnel from your laptop:
+through a temporary tunnel from your laptop (or just run `./scripts/tunnels.sh`):
 ```bash
-kubectl port-forward -n monitoring svc/grafana 3001:80
-# then open http://localhost:3001
+kubectl port-forward -n monitoring svc/kps-grafana 3001:80
+# then open http://localhost:3001  ->  dashboard "OrderPilot — Cluster & Temporal"
 ```
 Login is `admin`; the password is stored in a Kubernetes secret, read with:
 ```bash
-kubectl get secret -n monitoring grafana -o jsonpath='{.data.admin-password}' | base64 -d
+kubectl -n monitoring get secret kps-grafana -o jsonpath='{.data.admin-password}' | base64 -d
 ```
 A dropped tunnel shows "connection refused" in the browser — just re-run the port-forward
 (`tunnels.sh` does this automatically with auto-restart).

@@ -43,11 +43,15 @@ cat <<EOF
    cd frontend && NEXT_PUBLIC_API_BASE=$NODEPORT npm run dev
    -> http://localhost:3000
 
- Temporal Web UI (port-forward; never public):
-   kubectl port-forward -n orderpilot svc/temporal-ui 8080:8080
-   -> http://localhost:8080
+ Dashboards/UIs (never public — open both tunnels with auto-restart):
+   ./scripts/tunnels.sh
+     Temporal Web UI -> http://localhost:8080
+     Grafana         -> http://localhost:3001  (admin / see secret below)
+       kubectl -n monitoring get secret kps-grafana -o jsonpath='{.data.admin-password}' | base64 -d
 
- (Grafana arrives in Phase 4.)
+ Demonstrate autoscaling:
+   KUBECONFIG=./kubeconfig kubectl -n orderpilot get hpa -w     # in one terminal
+   ./scripts/load_test.sh                                       # in another
 
  Tear down at end of session:  ./scripts/teardown.sh
 ============================================================

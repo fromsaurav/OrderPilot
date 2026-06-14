@@ -1,0 +1,76 @@
+# Grafana dashboard for OrderPilot, auto-imported by the kube-prometheus-stack Grafana sidecar
+# (label grafana_dashboard: "1"). Panels: cluster health (node CPU/mem), Temporal activity
+# (task latency p95, request rate), and the worker autoscaling story (replicas + CPU).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orderpilot-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  orderpilot.json: |
+    {
+      "uid": "orderpilot",
+      "title": "OrderPilot — Cluster & Temporal",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "time": { "from": "now-30m", "to": "now" },
+      "refresh": "10s",
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "hide": 0,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1, "type": "timeseries", "title": "Node CPU usage (%)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "100 * (1 - avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m])))", "legendFormat": "{{instance}}", "refId": "A" } ]
+        },
+        {
+          "id": 2, "type": "timeseries", "title": "Node memory used (%)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{instance}}", "refId": "A" } ]
+        },
+        {
+          "id": 3, "type": "timeseries", "title": "Temporal task latency p95 (s)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "histogram_quantile(0.95, sum(rate(task_latency_bucket{job=\"temporal\"}[2m])) by (le))", "legendFormat": "p95", "refId": "A" } ]
+        },
+        {
+          "id": 4, "type": "timeseries", "title": "Temporal request rate (req/s)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "sum(rate(service_requests{job=\"temporal\"}[1m]))", "legendFormat": "requests/s", "refId": "A" } ]
+        },
+        {
+          "id": 5, "type": "timeseries", "title": "Worker replicas (HPA)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "fieldConfig": { "defaults": { "unit": "none", "min": 0, "custom": { "drawStyle": "stepAfter", "fillOpacity": 15 } }, "overrides": [] },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "kube_deployment_status_replicas{namespace=\"orderpilot\", deployment=\"worker\"}", "legendFormat": "current", "refId": "A" }, { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "kube_deployment_spec_replicas{namespace=\"orderpilot\", deployment=\"worker\"}", "legendFormat": "desired", "refId": "B" } ]
+        },
+        {
+          "id": 6, "type": "timeseries", "title": "Worker CPU (cores)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "fieldConfig": { "defaults": { "unit": "none", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "${datasource}" }, "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"orderpilot\", pod=~\"worker-.*\", container!=\"\"}[2m]))", "legendFormat": "worker total", "refId": "A" } ]
+        }
+      ]
+    }

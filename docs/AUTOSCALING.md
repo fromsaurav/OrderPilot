@@ -1,6 +1,7 @@
 # Autoscaling (metrics-server + HPA) — in simple words
 
-> Status: design locked; deployed in Phase 4. Commands below are what we run once it's installed.
+> Status: **deployed & demonstrated.** Observed under load: 1 → 3 → 4 replicas as worker CPU hit
+> ~149%/50%, then 4 → 3 → 2 → 1 after the load stopped. metrics-server is bundled by k3s.
 
 ## What it is
 - **metrics-server** = a tiny component that reports **how much CPU/memory each pod is using**

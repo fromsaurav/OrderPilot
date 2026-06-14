@@ -62,7 +62,18 @@ kubectl -n "$NS" rollout status deploy/temporal-ui  --timeout=120s
 kubectl -n "$NS" rollout status deploy/backend      --timeout=300s
 kubectl -n "$NS" rollout status deploy/worker       --timeout=300s
 
+echo "==> [7/8] worker HPA (metrics-server is bundled by k3s)"
+kubectl apply -f "$ROOT/k8s/60-hpa.yaml"
+
+echo "==> [8/8] monitoring stack (kube-prometheus-stack, trimmed) + dashboard"
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo update prometheus-community >/dev/null 2>&1 || true
+helm upgrade --install kps prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace -f "$ROOT/k8s/monitoring/values.yaml" --timeout 8m
+kubectl apply -f "$ROOT/k8s/monitoring/dashboard-orderpilot.yaml"
+
 echo
 kubectl -n "$NS" get pods -o wide
+kubectl -n "$NS" get hpa
 echo
 echo "API NodePort: $(terraform -chdir="$ROOT/terraform" output -raw api_nodeport_url 2>/dev/null || echo 'http://<server-ip>:30080')"

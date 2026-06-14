@@ -1,0 +1,63 @@
+# Trimmed kube-prometheus-stack values (Phase 4). No Alertmanager (PDF: no alerting), explicit
+# resource requests/limits on every component, short retention, no persistence (emptyDir — fine,
+# re-creatable). Heavy components pinned to the server node so the agent node stays free for the
+# worker HPA. Prometheus also scrapes the Temporal server metrics endpoint.
+
+fullnameOverride: kps
+
+alertmanager:
+  enabled: false
+
+# k3s doesn't expose these the standard way — disable to avoid permanent down targets + overhead.
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+kubeEtcd: { enabled: false }
+
+prometheusOperator:
+  nodeSelector: { node-role.kubernetes.io/control-plane: "true" }
+  admissionWebhooks:
+    enabled: false
+  tls:
+    enabled: false
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: 200m, memory: 192Mi }
+
+kube-state-metrics:
+  nodeSelector: { node-role.kubernetes.io/control-plane: "true" }
+  resources:
+    requests: { cpu: 20m, memory: 48Mi }
+    limits: { cpu: 100m, memory: 128Mi }
+
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 20m, memory: 24Mi }
+    limits: { cpu: 100m, memory: 64Mi }
+
+grafana:
+  nodeSelector: { node-role.kubernetes.io/control-plane: "true" }
+  defaultDashboardsEnabled: true        # bundled Kubernetes dashboards = good "cluster health"
+  persistence: { enabled: false }
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: 200m, memory: 200Mi }
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+
+prometheus:
+  prometheusSpec:
+    nodeSelector: { node-role.kubernetes.io/control-plane: "true" }
+    retention: 2h
+    scrapeInterval: 30s
+    resources:
+      requests: { cpu: 100m, memory: 384Mi }
+      limits: { cpu: 500m, memory: 700Mi }
+    # Scrape the Temporal server metrics endpoint (enabled via PROMETHEUS_ENDPOINT).
+    additionalScrapeConfigs:
+      - job_name: temporal
+        static_configs:
+          - targets: ["temporal.orderpilot.svc.cluster.local:9090"]
