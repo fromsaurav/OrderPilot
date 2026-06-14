@@ -6,11 +6,19 @@
 set -euxo pipefail
 
 PUBLIC_IP="$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+PRIVATE_IP="$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)"
 
-# IMPORTANT: k3s default pod CIDR (10.42.0.0/16) and service CIDR (10.43.0.0/16) would overlap
-# our VPC (10.42.0.0/16) — flannel then routes real VPC IPs through the pod bridge and
-# node-to-node traffic breaks ("no route to host"). Move the overlay off the VPC range.
+# Networking notes (both fixes are load-bearing):
+#  1. k3s default pod CIDR (10.42/16) + service CIDR (10.43/16) would overlap our VPC (10.42/16);
+#     flannel then routes real VPC IPs through the pod bridge -> node-to-node "no route to host".
+#     Move the overlay off the VPC range.
+#  2. --advertise-address must be the PRIVATE IP. k3s otherwise defaults it to --node-external-ip
+#     (the public IP), so the in-cluster API VIP (10.96.0.1) DNATs to the public IP, which the
+#     security group only allows from the operator -> every pod->API call times out (coredns,
+#     local-path, initContainers). Pin node-ip + advertise-address to the private IP.
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
+  --node-ip $${PRIVATE_IP} \
+  --advertise-address $${PRIVATE_IP} \
   --node-external-ip $${PUBLIC_IP} \
   --tls-san $${PUBLIC_IP} \
   --cluster-cidr 10.244.0.0/16 \

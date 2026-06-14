@@ -31,6 +31,8 @@ resource "aws_instance" "server" {
     k3s_token = random_password.k3s_token.result
     node_port = var.node_port
   })
+  # k3s runs only at first boot, so a bootstrap change must recreate the instance.
+  user_data_replace_on_change = true
 
   tags = { Name = "${local.name}-server", Role = "k3s-server" }
 }
@@ -59,6 +61,7 @@ resource "aws_instance" "agent" {
     k3s_token         = random_password.k3s_token.result
     server_private_ip = aws_instance.server.private_ip
   })
+  user_data_replace_on_change = true
 
   tags = { Name = "${local.name}-agent", Role = "k3s-agent" }
 }

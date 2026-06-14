@@ -133,6 +133,18 @@ notes recorded as conscious choices, not gaps:
   **Fix:** k3s server bootstrap now sets `--cluster-cidr 10.244.0.0/16 --service-cidr
   10.96.0.0/16` (off the VPC range). The VPC stays `10.42.0.0/16`.
 
+- **`user_data` changes don't recreate the instance by default (June 14).** The AWS provider only
+  re-runs an instance's bootstrap on `user_data` change when `user_data_replace_on_change = true`
+  (default false) — otherwise it just updates state and the old box keeps running the old
+  bootstrap. **Fix:** set `user_data_replace_on_change = true` on both instances.
+
+- **`--advertise-address` must be the private IP (June 14).** With `--node-external-ip` set, k3s
+  defaults `--advertise-address` to the *public* IP, so the in-cluster `kubernetes` service VIP
+  (`10.96.0.1`) DNATs to the public IP — which the security group only allows from the operator,
+  not from pods. Result: coredns / local-path-provisioner / every pod→API call times out.
+  **Fix:** server bootstrap pins `--node-ip` and `--advertise-address` to the private IP (from
+  IMDS); `--tls-san <public-ip>` still lets the rewritten kubeconfig work from the laptop.
+
 ## Status log
 
 - **June 12 — Phase 0 + Phase 1 complete (local).** Full rules-only application working
