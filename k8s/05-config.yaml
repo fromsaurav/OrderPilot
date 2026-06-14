@@ -1,0 +1,20 @@
+# Non-secret app configuration shared by backend + worker. Secrets (DB password, Gemini key)
+# come from the orderpilot-secrets Secret, never from here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: orderpilot
+data:
+  TEMPORAL_ADDRESS: temporal:7233
+  TEMPORAL_NAMESPACE: default
+  TASK_QUEUE: order-supervisor
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: temporal
+  DB_NAME: orderpilot
+  DEFAULT_WAKE_INTERVAL_SECONDS: "60"
+  DEFAULT_MAX_RUN_AGE_SECONDS: "86400"
+  LLM_ENABLED: "false"
+  GEMINI_MODEL: gemini-1.5-flash
+  CORS_ORIGINS: "*"

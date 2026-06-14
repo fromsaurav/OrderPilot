@@ -1,0 +1,77 @@
+# Self-hosted Temporal server (Decision #6): the temporalio/auto-setup image — same one our
+# docker-compose uses. One pod running the server services, persisting to our Postgres with
+# SQL visibility and NO Elasticsearch. Databases are pre-created by Postgres init, so
+# SKIP_DB_CREATE=true; auto-setup just loads schema + registers the default namespace.
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal
+  namespace: orderpilot
+spec:
+  selector:
+    app: temporal
+  ports:
+    - name: grpc
+      port: 7233
+      targetPort: 7233
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal
+  namespace: orderpilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal
+  template:
+    metadata:
+      labels:
+        app: temporal
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      initContainers:
+        - name: wait-postgres
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h postgres -p 5432 -U temporal; do echo waiting-for-postgres; sleep 3; done"]
+      containers:
+        - name: temporal
+          image: temporalio/auto-setup:1.25.2
+          ports:
+            - containerPort: 7233
+          env:
+            - name: DB
+              value: postgres12
+            - name: DB_PORT
+              value: "5432"
+            - name: POSTGRES_SEEDS
+              value: postgres
+            - name: POSTGRES_USER
+              value: temporal
+            - name: POSTGRES_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: orderpilot-secrets
+                  key: postgres-password
+            - name: SKIP_DB_CREATE
+              value: "true"
+            - name: DBNAME
+              value: temporal
+            - name: VISIBILITY_DBNAME
+              value: temporal_visibility
+            - name: ENABLE_ES
+              value: "false"
+          readinessProbe:
+            tcpSocket:
+              port: 7233
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 400Mi
+            limits:
+              cpu: "1"
+              memory: 800Mi

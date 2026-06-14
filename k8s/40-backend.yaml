@@ -1,0 +1,74 @@
+# FastAPI backend. Exposed via NodePort 30080 (Decision #4) — the only app port reachable from
+# outside, locked to the operator IP by the security group. Image comes from ECR.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: orderpilot
+spec:
+  type: NodePort
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: orderpilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      imagePullSecrets:
+        - name: regcred
+      initContainers:
+        - name: wait-postgres
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h postgres -p 5432 -U temporal; do echo waiting-for-postgres; sleep 3; done"]
+      containers:
+        - name: backend
+          image: __ECR_REGISTRY__/orderpilot/backend:latest
+          imagePullPolicy: Always
+          command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: orderpilot-secrets
+                  key: postgres-password
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: orderpilot-secrets
+                  key: gemini-api-key
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

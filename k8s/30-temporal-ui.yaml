@@ -1,0 +1,49 @@
+# Temporal Web UI (official temporalio/ui image). ClusterIP only — reached via kubectl
+# port-forward, never exposed to the internet (PDF p.4). CORS origin set for localhost access
+# through the tunnel.
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-ui
+  namespace: orderpilot
+spec:
+  selector:
+    app: temporal-ui
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-ui
+  namespace: orderpilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal-ui
+  template:
+    metadata:
+      labels:
+        app: temporal-ui
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      containers:
+        - name: temporal-ui
+          image: temporalio/ui:2.32.0
+          ports:
+            - containerPort: 8080
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: temporal:7233
+            - name: TEMPORAL_CORS_ORIGINS
+              value: http://localhost:8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 160Mi

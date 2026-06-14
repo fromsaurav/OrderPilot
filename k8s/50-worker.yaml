@@ -1,0 +1,58 @@
+# Temporal worker — runs the workflow + activities. This is the HPA target (Phase 4), so it is
+# pinned to the AGENT node (away from the control-plane node) to give scale-up headroom without
+# starving Temporal/Postgres/monitoring (Decision #10). Image from ECR.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: orderpilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+      imagePullSecrets:
+        - name: regcred
+      initContainers:
+        - name: wait-postgres
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h postgres -p 5432 -U temporal; do echo waiting-for-postgres; sleep 3; done"]
+      containers:
+        - name: worker
+          image: __ECR_REGISTRY__/orderpilot/worker:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "app.temporal.worker"]
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: orderpilot-secrets
+                  key: postgres-password
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: orderpilot-secrets
+                  key: gemini-api-key
+                  optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

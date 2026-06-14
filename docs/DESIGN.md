@@ -123,6 +123,16 @@ notes recorded as conscious choices, not gaps:
 
 ---
 
+## Gotchas hit & fixed
+
+- **Pod/Service CIDR must not overlap the VPC CIDR (June 14).** k3s defaults to pod CIDR
+  `10.42.0.0/16` and service CIDR `10.43.0.0/16`. Our VPC is `10.42.0.0/16`, so flannel handed a
+  node a pod subnet (`10.42.1.0/24`) overlapping the VPC subnet — the node then routed real VPC
+  IPs (e.g. the server) through the pod bridge `cni0` and node-to-node traffic failed with "no
+  route to host" ~50s after join (intermittent: it worked until flannel installed the route).
+  **Fix:** k3s server bootstrap now sets `--cluster-cidr 10.244.0.0/16 --service-cidr
+  10.96.0.0/16` (off the VPC range). The VPC stays `10.42.0.0/16`.
+
 ## Status log
 
 - **June 12 — Phase 0 + Phase 1 complete (local).** Full rules-only application working
