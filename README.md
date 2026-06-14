@@ -6,6 +6,9 @@ PostgreSQL) deployed on **Kubernetes (k3s) in AWS** and provisioned 100% with **
 
 > SagePilot Platform Engineer Task. See the assignment PDF in the repo root for the spec.
 
+**▶ Just want to run it? See [QUICKSTART.md](QUICKSTART.md)** — steps for both when the backend is
+already deployed and when it isn't.
+
 ## Repository layout
 
 | Path | Purpose |
