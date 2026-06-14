@@ -140,16 +140,44 @@ summary / llm / fallback / lifecycle line:
 ## 5. Cluster topology & pod placement
 
 Two t3.medium k3s nodes on AWS (Decision #10), provisioned entirely by Terraform (VPC, subnet,
-IGW, security group, 2× EC2 via user-data, ECR; no NAT/EIP/LoadBalancer/EBS-CSI):
+IGW, security group, 2× EC2 via user-data, ECR; no NAT/EIP/LoadBalancer/EBS-CSI).
 
-- **Node 1 (k3s server)** — stateful + control workloads: Temporal server, PostgreSQL, the
-  backend, the Temporal Web UI, and the monitoring stack (Prometheus + Grafana + metrics-server).
-- **Node 2 (k3s agent)** — the **Temporal worker**, the only horizontally-scaled component
-  (HPA 1→4 on CPU). Isolating it gives the on-camera HPA load test headroom without starving
-  Temporal/Postgres/monitoring — single-node left only ~300 MiB spare at peak (DESIGN.md #10).
+### Namespaces
+- **`orderpilot`** — our application: the **5 pods** below.
+- **`kube-system`** — k3s built-ins we rely on: `coredns` (DNS), `local-path-provisioner` (PV
+  storage), `metrics-server` (feeds the worker HPA).
+- **`monitoring`** — the Prometheus + Grafana stack (added in Phase 4).
+
+### The 5 application pods (namespace `orderpilot`) and where they run
+
+```
+        NODE 1 · t3.medium · k3s SERVER                NODE 2 · t3.medium · k3s AGENT
+ ┌───────────────────────────────────────────────┐   ┌───────────────────────────────┐
+ │  postgres-0    StatefulSet  (local-path PV)     │   │  worker     Deployment         │
+ │  temporal      Deployment   (auto-setup)        │   │             (HPA 1→4 on CPU)   │
+ │  temporal-ui   Deployment   (port-forward only) │   │                                │
+ │  backend       Deployment   (NodePort 30080)    │   │                                │
+ └───────────────────────────────────────────────┘   └───────────────────────────────┘
+   k3s built-ins (kube-system) run across both nodes: coredns, local-path-provisioner,
+   metrics-server.  App pods are pinned by node role (see rationale below).
+```
+
+| Pod | Kind | Node | Role |
+|---|---|---|---|
+| `postgres-0` | StatefulSet | server | Temporal + app persistence (local-path PV) |
+| `temporal` | Deployment | server | Temporal server — auto-setup, SQL visibility, no ES |
+| `temporal-ui` | Deployment | server | Temporal Web UI (reached via port-forward only) |
+| `backend` | Deployment | server | FastAPI API, exposed on NodePort 30080 |
+| `worker` | Deployment | **agent** | workflow + activities; the HPA target (1→4) |
+
+### Placement rationale
+- **Node 1 (k3s server)** holds the stateful + control workloads (Postgres, Temporal, backend,
+  UI) and the Phase-4 monitoring stack.
+- **Node 2 (k3s agent)** holds only the **worker**, the one horizontally-scaled component — pinned
+  there (nodeAffinity: not control-plane) so the on-camera HPA load test has headroom without
+  starving Temporal/Postgres/monitoring; single-node left only ~300 MiB spare at peak (DESIGN.md #10).
 - Storage = k3s **local-path** PVs (no EBS-CSI → nothing orphaned on destroy); re-seedable via
-  `scripts/seed_demo.sh`. Temporal uses the `temporalio/auto-setup` image (same as local
-  compose), one pod, **SQL visibility, no Elasticsearch** (Decision #6).
+  `scripts/seed_demo.sh`. Temporal uses the `temporalio/auto-setup` image (same as local compose).
 
 ### Exposure / security boundaries (graded)
 
