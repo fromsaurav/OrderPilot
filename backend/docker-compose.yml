@@ -91,6 +91,10 @@ services:
       DB_USER: temporal
       DB_PASSWORD: temporal
       DB_NAME: orderpilot
+      # Single LLM call site (Decision #3). Provide GEMINI_API_KEY in backend/.env (gitignored)
+      # or the shell env to enable Gemini for customer_message_received; empty = rules path.
+      LLM_ENABLED: "${LLM_ENABLED:-true}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
 
 volumes:
   pgdata:

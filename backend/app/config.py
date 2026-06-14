@@ -31,8 +31,10 @@ class Settings(BaseSettings):
     default_wake_interval_seconds: int = 60
     default_max_run_age_seconds: int = 24 * 60 * 60  # 24h
 
-    # --- Agent (Decision #3): rules-only unless a key is present ---
-    llm_enabled: bool = False
+    # --- Agent (Decision #3): rules-only unless a Gemini key is present ---
+    # Enabled by default, but `llm_active` still requires a key — so with no key the system runs
+    # purely on rules, and simply supplying GEMINI_API_KEY turns the single LLM call site on.
+    llm_enabled: bool = True
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-flash"
 

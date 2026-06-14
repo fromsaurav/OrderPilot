@@ -34,21 +34,33 @@ export default function Home() {
   const [includeDebug, setIncludeDebug] = useState(false);
   const [eventTypes, setEventTypes] = useState([]);
   const [orderId, setOrderId] = useState("ORD-" + Math.floor(Math.random() * 9000 + 1000));
-  const [wake, setWake] = useState(30);
+  const [wake, setWake] = useState(5);
   const [maxAge, setMaxAge] = useState(3600);
   const [startInstr, setStartInstr] = useState("");
   const [evType, setEvType] = useState("order_created");
   const [evText, setEvText] = useState("");
   const [instr, setInstr] = useState("");
   const [err, setErr] = useState("");
+  const [offline, setOffline] = useState(false);
 
   const guard = (fn) => async (...a) => { try { setErr(""); await fn(...a); } catch (e) { setErr(String(e.message || e)); } };
 
-  const refreshRuns = useCallback(async () => setRuns((await api("/runs")).runs), []);
+  // Auto-dismiss the notice after a few seconds (also manually dismissable).
+  useEffect(() => { if (!err) return; const t = setTimeout(() => setErr(""), 8000); return () => clearTimeout(t); }, [err]);
+
+  // Polling refreshers must NEVER throw: a transient API blip (e.g. SG/IP change) flips an
+  // "offline" flag instead of crashing the page with an unhandled rejection (which blanked it).
+  const refreshRuns = useCallback(async () => {
+    try { setRuns((await api("/runs")).runs); setOffline(false); }
+    catch { setOffline(true); }
+  }, []);
   const refreshSelected = useCallback(async () => {
     if (!selected) return;
-    setDetail(await api(`/runs/${selected}`));
-    setLog((await api(`/runs/${selected}/log?include_debug=${includeDebug}`)).entries);
+    try {
+      setDetail(await api(`/runs/${selected}`));
+      setLog((await api(`/runs/${selected}/log?include_debug=${includeDebug}`)).entries);
+      setOffline(false);
+    } catch { setOffline(true); }
   }, [selected, includeDebug]);
 
   useEffect(() => { api("/events/types").then((d) => setEventTypes(d.event_types)).catch(() => {}); }, []);
@@ -90,8 +102,19 @@ export default function Home() {
   return (
     <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
       <h1 style={{ fontSize: 20 }}>OrderPilot — Order Supervisor</h1>
-      <p style={{ color: "#888", fontSize: 12, marginTop: -8 }}>Temporal-backed · API: {API}</p>
-      {err && <div style={{ ...C.panel, borderColor: "#a33", color: "#f99", marginBottom: 12 }}>⚠ {err}</div>}
+      <p style={{ color: "#888", fontSize: 12, marginTop: -8 }}>
+        Temporal-backed · API: {API}
+        {offline && <span style={{ color: "#e7c46a" }}> · reconnecting…</span>}
+      </p>
+      {err && (
+        <div role="alert" style={{ background: "#2a2418", border: "1px solid #6b5524", color: "#e7c46a",
+          borderRadius: 8, padding: "10px 12px", marginBottom: 12, display: "flex",
+          justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <span><b>⚠ Notice — </b>{err}</span>
+          <button onClick={() => setErr("")} aria-label="dismiss" style={{ background: "transparent",
+            border: "none", color: "#e7c46a", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+        </div>
+      )}
 
       {/* Start a run */}
       <div style={{ ...C.panel, marginBottom: 16 }}>

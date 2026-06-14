@@ -15,6 +15,8 @@ data:
   DB_NAME: orderpilot
   DEFAULT_WAKE_INTERVAL_SECONDS: "60"
   DEFAULT_MAX_RUN_AGE_SECONDS: "86400"
-  LLM_ENABLED: "false"
+  # Enabled, but inert until a non-empty gemini-api-key is in the orderpilot-secrets Secret
+  # (pass GEMINI_API_KEY to deploy.sh / standup.sh). With no key it stays on the rules path.
+  LLM_ENABLED: "true"
   GEMINI_MODEL: gemini-1.5-flash
   CORS_ORIGINS: "*"
