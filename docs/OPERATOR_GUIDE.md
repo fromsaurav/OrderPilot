@@ -39,5 +39,50 @@ terraform -chdir=terraform output operator_cidr
 If I'm on a changing connection, I can also pin it explicitly to avoid surprises:
 `terraform apply -var allowed_cidr=A.B.C.D/32`.
 
-<!-- TODO(phase5): full command-by-command runbook (kubeconfig, get nodes/pods, port-forwards,
-     Grafana login, HPA watch, reading logs) + per-command "what to say on video" lines. -->
+## Command-by-command runbook
+
+> Stand up / tear down / resume live in [QUICKSTART.md](../QUICKSTART.md). This section is the
+> "what each command means + what to say on camera" reference. Run from the repo root with
+> `export KUBECONFIG=$PWD/kubeconfig` first.
+
+### kubeconfig — `./scripts/fetch_kubeconfig.sh`
+Copies the cluster credentials off the server and rewrites the API address to its public IP.
+`standup.sh` runs it for you. **Say:** "This is the file kubectl uses to talk to the cloud cluster."
+
+### `kubectl get nodes`
+**Expect:** two rows, both `Ready` — one `control-plane` (server), one `<none>` (agent).
+**Means:** the cluster is formed and the agent joined. `NotReady` for ~1 min after boot is normal;
+if it persists see Troubleshooting. **Say:** "Two t3.medium nodes, both Ready — server and agent."
+
+### `kubectl -n orderpilot get pods`
+**Expect:** 5 pods `Running` 1/1: `postgres-0`, `temporal`, `temporal-ui`, `backend`, `worker`.
+**Means:** the whole app is up. `Init:0/1` = waiting on its dependency (Postgres); `CrashLoopBackOff`
+= read its logs. **Say:** "Temporal, Postgres, the API and the worker — all self-hosted on the cluster."
+
+### Temporal Web UI — `kubectl port-forward -n orderpilot svc/temporal-ui 8080:8080`
+Opens a tunnel to the in-cluster UI (it's not internet-exposed). Open `http://localhost:8080`.
+**Show:** the workflow list, then click one order → its event history (signals, timers, activities).
+**Say:** "This is Temporal itself — every order is one workflow; here's its full execution history."
+
+### Grafana — `kubectl port-forward -n monitoring svc/kps-grafana 3001:80`
+Open `http://localhost:3001`. **Login:** `admin` / password from the secret:
+```bash
+kubectl -n monitoring get secret kps-grafana -o jsonpath='{.data.admin-password}' | base64 -d
+```
+Open dashboard **"OrderPilot — Cluster & Temporal"**. Panels: node CPU/mem (cluster health),
+Temporal task-latency p95 + request rate (Temporal activity), worker replicas + CPU (the HPA).
+**Say:** "Prometheus scrapes the nodes and the Temporal server; this one dashboard shows cluster
+health and Temporal activity." *(Both tunnels at once: `./scripts/tunnels.sh`.)*
+
+### HPA under load — `kubectl -n orderpilot get hpa -w`  +  `./scripts/load_test.sh`
+The `-w` watch streams the HPA live. **Reading it:** `TARGETS 149%/50%` = current vs target CPU;
+`REPLICAS 1→4` = it's adding workers. After load stops, CPU falls and `REPLICAS` drops back to 1
+(~1–2 min). **Say:** "Worker CPU crosses the 50% target, the autoscaler adds pods up to 4, then
+removes them when the load clears — scale-up and scale-down."
+
+### Reading logs when something is red
+```bash
+kubectl -n orderpilot logs deploy/backend --tail=50      # or deploy/worker, deploy/temporal
+kubectl -n orderpilot describe pod <pod>                 # Events section explains Pending/Init/CrashLoop
+```
+**Say:** "If a pod is unhealthy, its logs and the describe Events tell you why."
