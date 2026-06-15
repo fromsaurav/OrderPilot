@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const RUN_LIMIT = 8; // recent runs shown before the "view older runs" expander
 
 async function api(path, method = "GET", body) {
   const res = await fetch(`${API}${path}`, {
@@ -42,6 +43,10 @@ export default function Home() {
   const [instr, setInstr] = useState("");
   const [err, setErr] = useState("");
   const [offline, setOffline] = useState(false);
+  const [showAllRuns, setShowAllRuns] = useState(false);
+
+  const logRef = useRef(null);
+  const prevLogLen = useRef(0);
 
   const guard = (fn) => async (...a) => { try { setErr(""); await fn(...a); } catch (e) { setErr(String(e.message || e)); } };
 
@@ -71,6 +76,14 @@ export default function Home() {
   }, [refreshRuns, refreshSelected]);
   useEffect(() => { refreshSelected(); }, [refreshSelected]);
 
+  // Auto-scroll the activity log to the newest entry whenever entries are added (or run switched).
+  useEffect(() => {
+    if (log.length === prevLogLen.current) return;
+    prevLogLen.current = log.length;
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [log]);
+
   const startRun = guard(async () => {
     const body = { order_id: orderId, wake_interval_s: Number(wake), max_run_age_s: Number(maxAge) };
     if (startInstr.trim()) body.instructions = [startInstr.trim()];
@@ -99,25 +112,32 @@ export default function Home() {
     await refreshSelected(); await refreshRuns();
   });
 
+  const visibleRuns = showAllRuns ? runs : runs.slice(0, RUN_LIMIT);
+  const hiddenCount = runs.length - visibleRuns.length;
+
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 20 }}>OrderPilot — Order Supervisor</h1>
-      <p style={{ color: "#888", fontSize: 12, marginTop: -8 }}>
-        Temporal-backed · API: {API}
-        {offline && <span style={{ color: "#e7c46a" }}> · reconnecting…</span>}
-      </p>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", padding: 16, gap: 12 }}>
+      {/* Header */}
+      <div>
+        <h1 style={{ fontSize: 20, margin: 0 }}>OrderPilot — Order Supervisor</h1>
+        <p style={{ color: "#888", fontSize: 12, margin: "2px 0 0" }}>
+          Temporal-backed · API: {API}
+          {offline && <span style={{ color: "#e7c46a" }}> · reconnecting…</span>}
+        </p>
+      </div>
+
       {err && (
         <div role="alert" style={{ background: "#2a2418", border: "1px solid #6b5524", color: "#e7c46a",
-          borderRadius: 8, padding: "10px 12px", marginBottom: 12, display: "flex",
-          justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          borderRadius: 8, padding: "10px 12px", display: "flex", justifyContent: "space-between",
+          alignItems: "flex-start", gap: 12 }}>
           <span><b>⚠ Notice — </b>{err}</span>
           <button onClick={() => setErr("")} aria-label="dismiss" style={{ background: "transparent",
             border: "none", color: "#e7c46a", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
         </div>
       )}
 
-      {/* Start a run */}
-      <div style={{ ...C.panel, marginBottom: 16 }}>
+      {/* Start a run (full-width bar) */}
+      <div style={C.panel}>
         <b>Start a run</b>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
           <label>order <input style={C.input} value={orderId} onChange={(e) => setOrderId(e.target.value)} /></label>
@@ -128,27 +148,34 @@ export default function Home() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
-        {/* Runs list */}
-        <div style={C.panel}>
+      {/* Main area: fixed sidebar + content, fills remaining viewport height */}
+      <div style={{ display: "flex", gap: 16, flex: 1, minHeight: 0 }}>
+        {/* Runs sidebar */}
+        <div style={{ ...C.panel, width: 300, flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
           <b>Runs ({runs.length})</b>
-          <div style={{ marginTop: 8 }}>
-            {runs.map((r) => (
+          <div className="op-scroll" style={{ marginTop: 8, overflowY: "auto", flex: 1, minHeight: 0 }}>
+            {visibleRuns.map((r) => (
               <div key={r.run_id} onClick={() => setSelected(r.run_id)}
                 style={{ padding: 8, borderRadius: 6, marginBottom: 6, cursor: "pointer",
                   background: selected === r.run_id ? "#222838" : "transparent", border: "1px solid #232833" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>{r.order_id}</span><span style={C.badge(r.status)}>{r.status}</span>
                 </div>
-                <div style={{ color: "#777", fontSize: 11 }}>{r.run_id}</div>
+                <div style={{ color: "#777", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.run_id}</div>
               </div>
             ))}
             {runs.length === 0 && <div style={{ color: "#777", fontSize: 12 }}>no runs yet</div>}
           </div>
+          {(hiddenCount > 0 || showAllRuns) && runs.length > RUN_LIMIT && (
+            <button onClick={() => setShowAllRuns((v) => !v)}
+              style={{ ...C.btn, marginTop: 8, marginRight: 0, width: "100%", textAlign: "center" }}>
+              {showAllRuns ? "▲ Show fewer" : `▼ View older runs (${hiddenCount})`}
+            </button>
+          )}
         </div>
 
-        {/* Selected run */}
-        <div style={C.panel}>
+        {/* Selected run + activity log (fills width + height) */}
+        <div style={{ ...C.panel, flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           {!selected && <div style={{ color: "#777" }}>Select a run to inspect.</div>}
           {selected && detail && (
             <>
@@ -187,19 +214,19 @@ export default function Home() {
 
               {/* Live state */}
               {detail.live?.state && Object.keys(detail.live.state).length > 0 && (
-                <div style={{ fontSize: 11, color: "#9ab", marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: "#9ab", marginBottom: 8, wordBreak: "break-word" }}>
                   state: {JSON.stringify(detail.live.state)}
                 </div>
               )}
 
-              {/* Activity log */}
+              {/* Activity log — fills the rest of the height */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <b>Activity log ({log.length})</b>
                 <label style={{ fontSize: 11, color: "#aaa" }}>
                   <input type="checkbox" checked={includeDebug} onChange={(e) => setIncludeDebug(e.target.checked)} /> show debug (no-op wakes)
                 </label>
               </div>
-              <div style={{ marginTop: 6, maxHeight: 420, overflowY: "auto", fontSize: 12 }}>
+              <div ref={logRef} className="op-scroll" style={{ marginTop: 6, overflowY: "auto", flex: 1, minHeight: 0, fontSize: 12 }}>
                 {log.map((e) => (
                   <div key={e.id} style={{ padding: "4px 0", borderBottom: "1px solid #20242e", opacity: e.visibility === "debug" ? 0.55 : 1 }}>
                     <span style={{ color: KIND_COLORS[e.kind] || "#aaa" }}>

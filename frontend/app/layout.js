@@ -1,3 +1,5 @@
+import "./globals.css";
+
 export const metadata = {
   title: "OrderPilot — Order Supervisor",
   description: "Temporal-backed order supervisor control panel",
