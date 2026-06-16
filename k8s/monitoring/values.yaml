@@ -37,11 +37,14 @@ prometheus-node-exporter:
 
 grafana:
   nodeSelector: { node-role.kubernetes.io/control-plane: "true" }
+  # POC convenience: a fixed admin password (Grafana is port-forward-only, never internet-exposed,
+  # and the spec says no auth needed) so the password doesn't change across reinstalls.
+  adminPassword: "orderpilot"
   defaultDashboardsEnabled: true        # bundled Kubernetes dashboards = good "cluster health"
   persistence: { enabled: false }
   resources:
-    requests: { cpu: 50m, memory: 96Mi }
-    limits: { cpu: 200m, memory: 200Mi }
+    requests: { cpu: 50m, memory: 160Mi }
+    limits: { cpu: 300m, memory: 512Mi } # 200Mi OOM-killed Grafana when loading dashboards
   sidecar:
     dashboards:
       enabled: true
