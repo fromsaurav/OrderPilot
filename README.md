@@ -100,7 +100,6 @@ Full rationale, the alternatives weighed, and the infra gotchas hit & fixed:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, workflow lifecycle, data model, cluster topology |
 | [docs/BUSINESS_LOGIC.md](docs/BUSINESS_LOGIC.md) | How the app works, function by function |
 | [docs/OPERATOR_GUIDE.md](docs/OPERATOR_GUIDE.md) | Command-by-command runbook + video narration |
-| [docs/DEMO.md](docs/DEMO.md) | 10–15 min video shot list (mapped to the spec) |
 | [docs/TOOLS.md](docs/TOOLS.md) | Per-tool quick reference |
 | [docs/TERRAFORM.md](docs/TERRAFORM.md) · [docs/AWS.md](docs/AWS.md) · [docs/MONITORING.md](docs/MONITORING.md) · [docs/AUTOSCALING.md](docs/AUTOSCALING.md) | Plain-words tool primers |
 
