@@ -152,12 +152,14 @@ IGW, security group, 2× EC2 via user-data, ECR; no NAT/EIP/LoadBalancer/EBS-CSI
 
 ```
         NODE 1 · t3.medium · k3s SERVER                NODE 2 · t3.medium · k3s AGENT
- ┌───────────────────────────────────────────────┐   ┌───────────────────────────────┐
+        
+ ┌───────────────────────────────────────────────--┐   ┌───────────────────────────────-┐
  │  postgres-0    StatefulSet  (local-path PV)     │   │  worker     Deployment         │
  │  temporal      Deployment   (auto-setup)        │   │             (HPA 1→4 on CPU)   │
  │  temporal-ui   Deployment   (port-forward only) │   │                                │
  │  backend       Deployment   (NodePort 30080)    │   │                                │
- └───────────────────────────────────────────────┘   └───────────────────────────────┘
+ └───────────────────────────────────────────────--┘   └───────────────────────────────-┘
+
    k3s built-ins (kube-system) run across both nodes: coredns, local-path-provisioner,
    metrics-server.  App pods are pinned by node role (see rationale below).
 ```
